@@ -2,8 +2,8 @@
 
 import {
   motion,
+  useMotionValue,
   useMotionValueEvent,
-  useScroll,
   useSpring,
   useTransform,
 } from "framer-motion";
@@ -22,22 +22,15 @@ export default function HeadphoneScroll({ frames }: HeadphoneScrollProps) {
   const imagesRef = useRef<HTMLImageElement[]>([]);
   const rafRef = useRef<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLocked, setIsLocked] = useState(true);
+  const lockRef = useRef(true);
+  const touchStartY = useRef<number | null>(null);
 
   const frameUrls = useMemo(() => frames, [frames]);
   const frameCount = frameUrls.length;
 
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"],
-  });
-
-  const animationProgress = useTransform(
-    scrollYProgress,
-    [0, 0.02, 1],
-    [0, 0, 1],
-    { clamp: true }
-  );
-  const smoothProgress = useSpring(scrollYProgress, {
+  const animationProgress = useMotionValue(0);
+  const smoothProgress = useSpring(animationProgress, {
     stiffness: 200,
     damping: 30,
     mass: 0.2,
@@ -172,8 +165,82 @@ export default function HeadphoneScroll({ frames }: HeadphoneScrollProps) {
   const progressScale = useTransform(smoothProgress, [0, 1], [0, 1]);
   const callNowOpacity = useTransform(smoothProgress, [0.6, 0.7], [0, 1]);
 
+  useEffect(() => {
+    lockRef.current = isLocked;
+    if (isLocked) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isLocked]);
+
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      if (!lockRef.current) return;
+      event.preventDefault();
+      const speed = 0.0012;
+      const next = clamp(
+        animationProgress.get() + event.deltaY * speed,
+        0,
+        1
+      );
+      animationProgress.set(next);
+      if (next >= 1 && event.deltaY > 0) {
+        setIsLocked(false);
+      }
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (!lockRef.current) return;
+      touchStartY.current = event.touches[0]?.clientY ?? null;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (!lockRef.current) return;
+      if (touchStartY.current === null) return;
+      event.preventDefault();
+      const currentY = event.touches[0]?.clientY ?? touchStartY.current;
+      const deltaY = touchStartY.current - currentY;
+      const speed = 0.002;
+      const next = clamp(
+        animationProgress.get() + deltaY * speed,
+        0,
+        1
+      );
+      animationProgress.set(next);
+      touchStartY.current = currentY;
+      if (next >= 1 && deltaY > 0) {
+        setIsLocked(false);
+      }
+    };
+
+    const handleScroll = () => {
+      if (!lockRef.current && window.scrollY <= 0) {
+        setIsLocked(true);
+      }
+    };
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, [animationProgress]);
+
   return (
-    <section ref={containerRef} className="relative h-[400vh] w-full">
+    <section
+      ref={containerRef}
+      className="relative h-screen w-full overflow-hidden"
+    >
       <canvas
         ref={canvasRef}
         className="sticky top-0 h-screen w-full bg-[#050505]"
