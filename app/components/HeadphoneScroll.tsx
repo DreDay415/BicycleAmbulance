@@ -164,6 +164,23 @@ export default function HeadphoneScroll({ frames }: HeadphoneScrollProps) {
   );
   const progressScale = useTransform(smoothProgress, [0, 1], [0, 1]);
   const callNowOpacity = useTransform(smoothProgress, [0.6, 0.7], [0, 1]);
+  const welcomeHoldStart = frameCount > 1 ? 84 / (frameCount - 1) : 0;
+  const welcomeHoldEnd = frameCount > 1 ? 143 / (frameCount - 1) : 1;
+  const opacityWelcomeHold = useTransform(
+    smoothProgress,
+    [
+      welcomeHoldStart,
+      welcomeHoldStart + 0.02,
+      welcomeHoldEnd - 0.02,
+      welcomeHoldEnd,
+    ],
+    [0, 1, 1, 0]
+  );
+  const welcomeHoldY = useTransform(
+    smoothProgress,
+    [welcomeHoldStart, welcomeHoldEnd],
+    [16, -16]
+  );
 
   useEffect(() => {
     lockRef.current = isLocked;
@@ -319,6 +336,15 @@ export default function HeadphoneScroll({ frames }: HeadphoneScrollProps) {
             Top Tier Service
           </h2>
         </div>
+      </motion.div>
+
+      <motion.div
+        style={{ opacity: opacityWelcomeHold, y: welcomeHoldY }}
+        className="pointer-events-none sticky top-0 z-20 flex h-screen w-full items-center justify-center text-center"
+      >
+        <h2 className="text-balance text-4xl font-semibold tracking-tight text-white/90 md:text-6xl">
+          Welcome
+        </h2>
       </motion.div>
 
     </section>
